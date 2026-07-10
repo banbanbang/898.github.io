@@ -1,0 +1,563 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>华夏国证半导体芯片ETF (159995) 实时持仓分析</title>
+<style>
+  :root {
+    --bg: oklch(0.135 0.011 260);
+    --surface: oklch(0.168 0.013 260);
+    --elevated: oklch(0.20 0.014 260);
+    --hover: oklch(0.23 0.014 260);
+    --border: oklch(0.255 0.012 260);
+    --text: oklch(0.91 0 0);
+    --text2: oklch(0.64 0.012 260);
+    --muted: oklch(0.47 0.012 260);
+    --green: oklch(0.67 0.18 150);
+    --red: oklch(0.61 0.22 25);
+    --yellow: oklch(0.71 0.16 85);
+    --blue: oklch(0.62 0.12 240);
+    --green-bg: oklch(0.67 0.18 150 / 0.10);
+    --red-bg: oklch(0.61 0.22 25 / 0.10);
+    --blue-bg: oklch(0.62 0.12 240 / 0.10);
+    --rad: 6px;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html{font-size:14px;-webkit-font-smoothing:antialiased}
+  body{
+    font-family:'PingFang SC','Hiragino Sans GB','Noto Sans SC','Microsoft YaHei',sans-serif;
+    background:var(--bg);color:var(--text);min-height:100vh
+  }
+  .header{
+    background:var(--surface);border-bottom:1px solid var(--border);
+    padding:16px 24px;position:sticky;top:0;z-index:100
+  }
+  .h-inner{
+    max-width:1500px;margin:0 auto;display:flex;align-items:center;
+    justify-content:space-between;gap:16px;flex-wrap:wrap
+  }
+  .h-left{min-width:0}
+  .h-title{font-size:1.1rem;font-weight:700;letter-spacing:-0.01em}
+  .h-sub{font-size:0.78rem;color:var(--text2);margin-top:2px;display:flex;align-items:center;gap:8px}
+  .h-code{
+    font-family:'SF Mono','Cascadia Code','JetBrains Mono','Consolas',monospace;
+    background:var(--elevated);padding:2px 8px;border-radius:4px;
+    font-size:0.76rem;color:var(--green);letter-spacing:0.02em
+  }
+  .h-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
+  .status{font-size:0.76rem;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .dot.loading{background:var(--yellow);animation:pulse 1.2s ease-in-out infinite}
+  .dot.ok{background:var(--green)}.dot.err{background:var(--red)}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.85)}}
+  .btn{
+    font-family:inherit;font-size:0.82rem;font-weight:600;padding:8px 18px;
+    border-radius:var(--rad);border:1px solid oklch(0.67 0.18 150 / 0.35);
+    background:var(--green-bg);color:var(--green);cursor:pointer;
+    transition:all 0.2s;display:flex;align-items:center;gap:6px;white-space:nowrap
+  }
+  .btn:hover{background:oklch(0.67 0.18 150 / 0.22);border-color:var(--green)}
+  .btn:active{transform:scale(0.97)}.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+  .btn svg{width:14px;height:14px;flex-shrink:0}
+  .btn.refreshing svg{animation:spin 0.8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ETF Summary Row */
+  .etf-summary{
+    max-width:1500px;margin:0 auto;padding:14px 24px 6px
+  }
+  .etf-summary-inner{
+    background:var(--blue-bg);
+    border:1px solid oklch(0.62 0.12 240 / 0.25);
+    border-radius:var(--rad);
+    padding:14px 18px;
+    display:flex;align-items:center;gap:28px;flex-wrap:wrap
+  }
+  .etf-summary-item{display:flex;align-items:baseline;gap:8px}
+  .etf-summary-label{font-size:0.74rem;color:var(--text2);letter-spacing:0.03em}
+  .etf-summary-value{font-size:1.15rem;font-weight:700;font-family:monospace;color:var(--blue)}
+  .etf-summary-value.up{color:var(--green)}.etf-summary-value.down{color:var(--red)}
+
+  .stats{
+    max-width:1500px;margin:0 auto;padding:6px 24px 10px;
+    display:flex;gap:20px;flex-wrap:wrap
+  }
+  .stat{display:flex;flex-direction:column;gap:2px}
+  .stat-l{font-size:0.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em}
+  .stat-v{font-size:0.92rem;font-weight:700;font-family:monospace}
+  .stat-v.up{color:var(--green)}.stat-v.down{color:var(--red)}
+
+  .tbl-outer{max-width:1500px;margin:0 auto;padding:0 24px 40px}
+  .tbl-wrap{
+    background:var(--surface);border-radius:8px;
+    border:1px solid var(--border);
+    overflow-x:auto;-webkit-overflow-scrolling:touch
+  }
+  .tbl-wrap::after{
+    content:'';position:sticky;right:0;top:0;bottom:0;width:24px;
+    background:linear-gradient(to right,transparent,var(--surface));
+    pointer-events:none;z-index:1;float:right;margin-left:-24px
+  }
+  table{min-width:100%;border-collapse:collapse;font-size:0.8rem;white-space:nowrap}
+  thead th{
+    background:var(--elevated);color:var(--text2);font-weight:600;
+    text-align:right;padding:10px 12px;font-size:0.74rem;letter-spacing:0.02em;
+    border-bottom:2px solid var(--border);cursor:pointer;user-select:none
+  }
+  thead th:first-child{text-align:center}
+  thead th:nth-child(2),thead th:nth-child(3){text-align:left}
+  thead th:hover{color:var(--text)}
+  thead th .si{display:inline-block;margin-left:3px;font-size:0.6rem;opacity:0.3}
+  thead th.sort .si{opacity:1;color:var(--green)}
+  thead th.sort{color:var(--green)}
+  tbody td{
+    padding:9px 12px;text-align:right;border-bottom:1px solid oklch(0.255 0.012 260 / 0.4);
+    font-family:monospace;font-size:0.78rem
+  }
+  tbody td:nth-child(1){text-align:center;color:var(--muted);font-size:0.74rem;width:38px}
+  tbody td:nth-child(2){text-align:left;color:var(--text2)}
+  tbody td:nth-child(3){text-align:left;font-family:inherit;font-weight:500}
+  tbody td.wt{color:var(--green);font-weight:600}
+  tbody td.pr{font-weight:600}
+  tbody td.pos{color:var(--green)}tbody td.neg{color:var(--red)}
+  tbody td.tm{color:var(--muted);font-size:0.74rem}
+  tbody tr{transition:background 0.12s}
+  tbody tr:hover{background:var(--hover)}
+  tbody tr:last-child td{border-bottom:none}
+  .msg{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:70px 24px;color:var(--muted);gap:12px;text-align:center
+  }
+  .msg .ico{font-size:2.2rem;opacity:0.45}
+  .msg .tt{font-size:0.95rem;font-weight:600;color:var(--text2)}
+  .msg .tx{font-size:0.8rem;max-width:360px;line-height:1.6}
+  .skel{display:flex;gap:12px;padding:10px 12px;border-bottom:1px solid var(--border)}
+  .skel div{height:17px;background:var(--elevated);border-radius:4px;flex:1;animation:shimmer 1.5s ease-in-out infinite}
+  @keyframes shimmer{0%{opacity:0.35}50%{opacity:0.65}100%{opacity:0.35}}
+  .ft{
+    max-width:1500px;margin:0 auto;padding:0 24px 16px;
+    font-size:0.68rem;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap
+  }
+  .ft span{opacity:0.55}
+  @media(max-width:768px){
+    .header{padding:12px 14px}.h-title{font-size:0.95rem}
+    .etf-summary{padding:10px 14px 2px}.etf-summary-inner{padding:10px 14px;gap:16px}
+    .etf-summary-value{font-size:1rem}
+    .stats{padding:4px 14px 8px;gap:10px}.tbl-outer{padding:0 10px 24px}
+    table{font-size:0.72rem}thead th,tbody td{padding:7px 8px}
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="h-inner">
+    <div class="h-left">
+      <div class="h-title">华夏国证半导体芯片ETF 实时持仓分析</div>
+      <div class="h-sub"><span class="h-code">159995</span>跟踪：国证芯片 (980017) · 基金经理：赵宗庭</div>
+    </div>
+    <div class="h-right">
+      <div class="status"><span class="dot" id="dot"></span><span id="ts">—</span></div>
+      <button class="btn" id="btn" onclick="doRefresh()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 11-3-6.7M21 2v6h-6"/></svg>
+        刷新数据
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ETF预估波动率汇总行 -->
+<div class="etf-summary" id="etfSummary" style="display:none">
+  <div class="etf-summary-inner">
+    <div class="etf-summary-item">
+      <span class="etf-summary-label">ETF 预估日内波动率</span>
+      <span class="etf-summary-value" id="etfVol">—</span>
+    </div>
+    <div class="etf-summary-item">
+      <span class="etf-summary-label">加权平均波动(权重×个股波动率)</span>
+      <span class="etf-summary-value" id="etfWavg">—</span>
+    </div>
+    <div class="etf-summary-item">
+      <span class="etf-summary-label">成份股波动贡献</span>
+      <span class="etf-summary-value" id="etfContrib">—</span>
+    </div>
+  </div>
+</div>
+
+<div class="stats" id="stats" style="display:none">
+  <div class="stat"><span class="stat-l">持仓股票</span><span class="stat-v" id="sCnt">—</span></div>
+  <div class="stat"><span class="stat-l">涨 / 跌</span><span class="stat-v" id="sUd">—</span></div>
+  <div class="stat"><span class="stat-l">数据源</span><span class="stat-v" id="sSrc">腾讯行情</span></div>
+</div>
+
+<div class="tbl-outer">
+  <div class="tbl-wrap" id="wrap">
+    <div class="msg" id="empty">
+      <div class="ico">&#9636;</div>
+      <div class="tt">点击刷新加载数据</div>
+      <div class="tx">通过腾讯行情接口获取 159995 全部 30 只成份股的实时价格、权重与波动率</div>
+    </div>
+    <table id="tbl" style="display:none">
+      <thead><tr>
+        <th data-sort="idx">#</th>
+        <th data-sort="code">股票代码</th>
+        <th data-sort="name">股票名称</th>
+        <th data-sort="wt" class="sort">最新ETF权重 <span class="si">▼</span></th>
+        <th data-sort="open">今日开盘价</th>
+        <th data-sort="price">最新价</th>
+        <th data-sort="time">更新时间</th>
+        <th data-sort="chg">开盘→当前波动率</th>
+        <th data-sort="pchg">股价变化(元)</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="ft">
+  <span>行情：qt.gtimg.cn（腾讯） | 持仓：新浪PCF + 2026Q1季报披露权重交叉验证</span>
+  <span>权重公式：PCF数量 × 最新价 ÷ Σ(数量×最新价) | 与季报披露权重偏差来自调仓与价格变动</span>
+  <span>R键刷新 | 交易时段每60s自动刷新</span>
+</div>
+
+<script>
+/* ═══════════════ ETF Holdings ═══════════════
+ * Source: Sina PCF (2026-07-10) — full 30 constituents
+ * Quantity = 最小申购赎回单位对应成份股数量
+ * Weight = (qty × price) / Σ(qty × price)
+ *
+ * Cross-reference: 2026Q1 disclosed top-10 weights:
+ *   海光信息 10.09% / 北方华创 9.12% / 中芯国际 8.50% / 兆易创新 8.00%
+ *   寒武纪 7.34% / 中微公司 7.33% / 澜起科技 7.29% / 豪威集团 4.20%
+ *   芯原股份 3.55% / 拓荆科技 3.45%
+ * Real-time weights will differ due to price movements since 2026-03-31.
+ */
+var ETF_HOLDINGS = [
+  {code:'688981',name:'中芯国际',qty:3501},
+  {code:'688041',name:'海光信息',qty:1657},
+  {code:'002371',name:'北方华创',qty:700},
+  {code:'688256',name:'寒武纪',qty:453},
+  {code:'603986',name:'兆易创新',qty:1100},
+  {code:'688012',name:'中微公司',qty:1281},
+  {code:'688008',name:'澜起科技',qty:1986},
+  {code:'603501',name:'豪威集团',qty:1400},
+  {code:'688072',name:'拓荆科技',qty:335},
+  {code:'600584',name:'长电科技',qty:2600},
+  {code:'688521',name:'芯原股份',qty:737},
+  {code:'002049',name:'紫光国微',qty:1200},
+  {code:'600703',name:'三安光电',qty:6100},
+  {code:'002156',name:'通富微电',qty:2100},
+  {code:'600460',name:'士兰微',qty:2100},
+  {code:'688249',name:'晶合集成',qty:1502},
+  {code:'300316',name:'晶盛机电',qty:1100},
+  {code:'603893',name:'瑞芯微',qty:400},
+  {code:'688396',name:'华润微',qty:839},
+  {code:'300223',name:'北京君正',qty:600},
+  {code:'688126',name:'沪硅产业',qty:3000},
+  {code:'688120',name:'华海清科',qty:666},
+  {code:'688082',name:'盛美上海',qty:232},
+  {code:'688047',name:'龙芯中科',qty:308},
+  {code:'301269',name:'华大九天',qty:400},
+  {code:'300604',name:'长川科技',qty:800},
+  {code:'688525',name:'佰维存储',qty:684},
+  {code:'001309',name:'德明利',qty:300},
+  {code:'688702',name:'盛科通信',qty:200},
+  {code:'688498',name:'源杰科技',qty:200}
+];
+
+/* ═══════════════ DOM ═══════════════ */
+var btn=document.getElementById('btn'),dot=document.getElementById('dot'),
+    ts=document.getElementById('ts'),tbl=document.getElementById('tbl'),
+    tbody=document.getElementById('tbody'),empty=document.getElementById('empty'),
+    stats=document.getElementById('stats'),etfSummary=document.getElementById('etfSummary');
+
+var sortField='wt',sortAsc=false,latestData=[],latestQuotes={};
+
+/* ═══════════════ Fetch via fetch() (Tencent qt.gtimg.cn) ═══════════════ */
+function fetchQuotes(callback){
+  var codes=ETF_HOLDINGS.map(function(h){
+    return (h.code.charAt(0)==='6'?'sh':'sz')+h.code;
+  });
+  var url='https://qt.gtimg.cn/q='+codes.join(',');
+  
+  var controller=new AbortController();
+  var timeout=setTimeout(function(){
+    controller.abort();
+    callback(new Error('腾讯行情接口超时'));
+  },12000);
+  
+  fetch(url,{signal:controller.signal})
+    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.text();})
+    .then(function(text){
+      clearTimeout(timeout);
+      var results={};
+      var re=/v_([\w]+)="([^"]*)"/g,m;
+      while((m=re.exec(text))!==null){
+        var rawCode=m[1],code=rawCode.substring(2);
+        var f=m[2].split('~');
+        if(f.length>45){
+          results[code]={
+            name:f[1],
+            price:parseFloat(f[3])||0,
+            open:parseFloat(f[5])||0,
+            ts:parseTs(f[30]),
+            totalMcap:parseFloat(f[45])||0,
+            floatMcap:parseFloat(f[44])||0
+          };
+        }
+      }
+      callback(null,results);
+    })
+    .catch(function(e){
+      clearTimeout(timeout);
+      callback(new Error(e.name==='AbortError'?'腾讯行情接口超时':'腾讯行情接口加载失败'));
+    });
+}
+
+function parseTs(raw){
+  if(!raw)return'';var s=String(raw);
+  if(s.length>=14)return s.substring(8,10)+':'+s.substring(10,12)+':'+s.substring(12,14);
+  return s;
+}
+
+/* ═══════════════ PCF auto-sync (Sina) ═══════════════
+ * Fetches the latest PCF from Sina fund page.
+ * The page contains a multi-day table with tab-separated fields:
+ *   流水号 | 公告日 | 交易日 | 股票代码 | 简称 | 数量(股) | ...
+ * We extract only the latest trading day, exclude "申赎现金", deduplicate.
+ * Falls back through multiple CORS proxies if one fails.
+ */
+var PCF_PROXIES = [
+  'https://api.allorigins.win/raw?url=',
+  'https://corsproxy.io/?',
+  'https://api.codetabs.com/v1/proxy?quest='
+];
+
+function tryUpdateHoldings(callback){
+  var url='https://money.finance.sina.com.cn/fund/go.php/vAkFundInfo_JJSGSHCFGXX/q/159995.phtml';
+  tryProxy(0);
+
+  function tryProxy(i){
+    if(i>=PCF_PROXIES.length){console.log('[PCF] 所有代理不可用');callback();return;}
+    var proxyUrl=PCF_PROXIES[i]+encodeURIComponent(url);
+    fetch(proxyUrl,{signal:AbortSignal.timeout(10000)})
+    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.text()})
+    .then(function(html){
+      var stocks=parsePCF(html);
+      if(stocks.length>=15){
+        ETF_HOLDINGS=stocks;
+        document.getElementById('sSrc').textContent='新浪PCF('+new Date().toISOString().slice(0,10)+')';
+        console.log('[PCF] 同步成功：'+stocks.length+'只 (代理#'+(i+1)+')');
+        callback();
+      }else{
+        console.log('[PCF] 解析不足15只，换代理重试');
+        tryProxy(i+1);
+      }
+    })
+    .catch(function(e){
+      console.log('[PCF] 代理#'+(i+1)+'失败: '+e.message);
+      tryProxy(i+1);
+    });
+  }
+}
+
+function parsePCF(html){
+  /* Regex matches PCF table rows:
+   *   9-digit流水号 \t+ date \t+ date \t+ stockCode \t+ name \t+ qty
+   * Tabs may be collapsed by some proxies; use \s+ tolerant matching.
+   * Only keeps the latest trading day (first group of rows).
+   */
+  var re=/\d{9}\s+(\d{4}-\d{2}-\d{2})\s+\d{4}-\d{2}-\d{2}\s+(\d+)\s+([^\s\d][^\s]*?)\s+([\d.]+)/g;
+  var m,found=[],seen={},latestDate='';
+
+  while((m=re.exec(html))!==null){
+    var tradeDate=m[1],code=m[2],name=m[3].trim(),qty=parseFloat(m[4]);
+
+    // Skip cash component and invalid entries
+    if(code==='159900'||name==='申赎现金'||name==='—'||qty<=0)continue;
+    if(name.length>8)continue; // unlikely stock name
+
+    // Determine latest trading date (first group of rows)
+    if(!latestDate)latestDate=tradeDate;
+    // Only process the latest day
+    if(tradeDate!==latestDate)continue;
+
+    if(!seen[code]){
+      seen[code]=true;
+      found.push({code:code,name:name,qty:qty});
+    }
+  }
+  return found;
+}
+
+/* ═══════════════ Calculate & Render ═══════════════ */
+function calcAndRender(quotes){
+  latestQuotes=quotes;
+  var stocks=[],totalNav=0;
+
+  // Pass 1: total NAV
+  for(var i=0;i<ETF_HOLDINGS.length;i++){
+    var h=ETF_HOLDINGS[i],q=quotes[h.code]||{};
+    totalNav+=h.qty*(q.price||0);
+  }
+
+  // Pass 2: build stock rows
+  for(var i=0;i<ETF_HOLDINGS.length;i++){
+    var h=ETF_HOLDINGS[i],q=quotes[h.code]||{};
+    var price=q.price||0,open=q.open||0;
+    var val=h.qty*price;
+    var wt=totalNav>0?(val/totalNav)*100:0;
+    var chgPct=null,priceChg=null;
+    if(open>0&&price>0){
+      chgPct=((price-open)/open)*100;
+      priceChg=price-open;
+    }
+    stocks.push({
+      code:h.code,name:h.name||q.name||'',
+      weight:wt,open:open,price:price,
+      updateTime:q.ts||'',chgPct:chgPct,priceChg:priceChg
+    });
+  }
+
+  // Calculate ETF-level metrics
+  var etfVol=0,etfWavg=0;
+  for(var i=0;i<stocks.length;i++){
+    if(stocks[i].chgPct!==null){
+      etfVol+=stocks[i].weight*stocks[i].chgPct;
+    }
+  }
+  etfVol=etfVol/100; // weighted average volatility
+  etfWavg=etfVol;
+
+  // Sort
+  stocks.sort(function(a,b){
+    var va,vb;
+    switch(sortField){
+      case 'wt':va=a.weight;vb=b.weight;break;
+      case 'code':va=a.code;vb=b.code;break;
+      case 'name':va=a.name;vb=b.name;break;
+      case 'open':va=a.open;vb=b.open;break;
+      case 'price':va=a.price;vb=b.price;break;
+      case 'time':va=a.updateTime;vb=b.updateTime;break;
+      case 'chg':va=a.chgPct!==null?a.chgPct:-Infinity;vb=b.chgPct!==null?b.chgPct:-Infinity;break;
+      case 'pchg':va=a.priceChg!==null?a.priceChg:-Infinity;vb=b.priceChg!==null?b.priceChg:-Infinity;break;
+      default:return 0;
+    }
+    if(va===vb)return 0;
+    return sortAsc?(va<vb?-1:1):(va>vb?-1:1);
+  });
+
+  // ETF summary
+  var volCls=etfVol>=0?'up':'down';
+  document.getElementById('etfVol').textContent=(etfVol>=0?'+':'')+etfVol.toFixed(2)+'%';
+  document.getElementById('etfVol').className='etf-summary-value '+volCls;
+  document.getElementById('etfWavg').textContent='Σ(权重×个股波动率) = '+(etfVol>=0?'+':'')+etfVol.toFixed(2)+'%';
+  document.getElementById('etfWavg').className='etf-summary-value '+volCls;
+
+  // Count up/down and top contributors
+  var up=0,dn=0;
+  var topPos=null,topNeg=null;
+  for(var i=0;i<stocks.length;i++){
+    var s=stocks[i];
+    if(s.chgPct!==null&&s.chgPct>0)up++;
+    else if(s.chgPct!==null&&s.chgPct<0)dn++;
+    if(s.chgPct!==null){
+      var contrib=s.weight*s.chgPct/100;
+      if(contrib>0&&(!topPos||contrib>topPos.c))topPos={n:s.name,c:contrib};
+      if(contrib<0&&(!topNeg||contrib<topNeg.c))topNeg={n:s.name,c:contrib};
+    }
+  }
+  var contribStr='';
+  if(topPos)contribStr+=topPos.n+'(+'+topPos.c.toFixed(2)+'%%)';
+  if(topNeg)contribStr+=(contribStr?' / ':'')+topNeg.n+'('+topNeg.c.toFixed(2)+'%%)';
+  document.getElementById('etfContrib').textContent=contribStr||'—';
+
+  document.getElementById('sCnt').textContent=stocks.length;
+  document.getElementById('sUd').innerHTML='<span style="color:var(--green)">'+up+' ↑</span> / <span style="color:var(--red)">'+dn+' ↓</span>';
+
+  // Render table
+  var html='';
+  for(var i=0;i<stocks.length;i++){
+    var s=stocks[i];
+    var priceDisp=s.price>0?s.price.toFixed(2):'—';
+    var openDisp=s.open>0?s.open.toFixed(2):'—';
+    var chgCls=s.chgPct===null?'':(s.chgPct>=0?'pos':'neg');
+    var pchgCls=s.priceChg===null?'':(s.priceChg>=0?'pos':'neg');
+    var chgStr=s.chgPct!==null?((s.chgPct>=0?'+':'')+s.chgPct.toFixed(2)+'%'):'—';
+    var pchgStr=s.priceChg!==null?((s.priceChg>=0?'+':'')+s.priceChg.toFixed(2)):'—';
+
+    html+='<tr>'+
+      '<td>'+(i+1)+'</td>'+
+      '<td>'+s.code+'</td>'+
+      '<td>'+s.name+'</td>'+
+      '<td class="'+(s.weight>3?'wt':'')+'">'+s.weight.toFixed(2)+'%</td>'+
+      '<td>'+openDisp+'</td>'+
+      '<td class="pr">'+priceDisp+'</td>'+
+      '<td class="tm">'+(s.updateTime||'—')+'</td>'+
+      '<td class="'+chgCls+'">'+chgStr+'</td>'+
+      '<td class="'+pchgCls+'">'+pchgStr+'</td>'+
+      '</tr>';
+  }
+  tbody.innerHTML=html;
+
+  // Update sort indicator
+  var ths=document.querySelectorAll('thead th');
+  for(var i=0;i<ths.length;i++){
+    var th=ths[i],f=th.dataset.sort;
+    th.classList.toggle('sort',f===sortField);
+    var si=th.querySelector('.si');
+    if(si)si.textContent=f===sortField?(sortAsc?'▲':'▼'):'⇅';
+  }
+
+  empty.style.display='none';tbl.style.display='';
+  stats.style.display='';etfSummary.style.display='';
+  latestData=stocks;
+}
+
+/* ═══════════════ Refresh ═══════════════ */
+function doRefresh(){
+  if(btn.disabled)return;
+  btn.disabled=true;btn.classList.add('refreshing');
+  dot.className='dot loading';ts.textContent='加载中...';
+  var t0=performance.now();
+
+  tryUpdateHoldings(function(){
+    fetchQuotes(function(err,quotes){
+      btn.disabled=false;btn.classList.remove('refreshing');
+      if(err){dot.className='dot err';ts.textContent='失败: '+err.message;console.error(err);return;}
+      calcAndRender(quotes);
+      var elapsed=((performance.now()-t0)/1000).toFixed(1);
+      var now=new Date();
+      ts.textContent=now.toLocaleTimeString('zh-CN',{hour12:false})+' ('+elapsed+'s)';
+      dot.className='dot ok';
+    });
+  });
+}
+
+/* ═══════════════ Sort ═══════════════ */
+document.querySelector('thead').addEventListener('click',function(e){
+  var th=e.target.closest('th');if(!th)return;
+  var f=th.dataset.sort;if(!f)return;
+  if(sortField===f)sortAsc=!sortAsc;else{sortField=f;sortAsc=false;}
+  if(latestData.length>0)calcAndRender(latestQuotes);
+});
+
+/* ═══════════════ Auto-refresh ═══════════════ */
+function isTradeTime(){
+  var n=new Date(),d=n.getDay();
+  if(d===0||d===6)return false;
+  var m=n.getHours()*60+n.getMinutes();
+  return(m>=555&&m<=695)||(m>=775&&m<=905);
+}
+setInterval(function(){if(isTradeTime()&&!btn.disabled)doRefresh()},60000);
+
+document.addEventListener('keydown',function(e){
+  if((e.key==='r'||e.key==='R')&&!(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'))doRefresh();
+});
+
+doRefresh();
+</script>
+</body>
+</html>

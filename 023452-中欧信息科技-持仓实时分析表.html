@@ -1,0 +1,503 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中欧信息科技混合发起C (023452) 持仓实时分析</title>
+<style>
+  :root {
+    --bg: oklch(0.130 0.012 255);
+    --surface: oklch(0.165 0.013 255);
+    --elevated: oklch(0.195 0.014 255);
+    --hover: oklch(0.225 0.014 255);
+    --border: oklch(0.25 0.012 255);
+    --text: oklch(0.91 0 0);
+    --text2: oklch(0.64 0.012 255);
+    --muted: oklch(0.47 0.012 255);
+    --green: oklch(0.67 0.18 150);
+    --red: oklch(0.61 0.22 25);
+    --yellow: oklch(0.71 0.16 85);
+    --blue: oklch(0.62 0.12 240);
+    --purple: oklch(0.58 0.16 300);
+    --green-bg: oklch(0.67 0.18 150 / 0.10);
+    --red-bg: oklch(0.61 0.22 25 / 0.10);
+    --blue-bg: oklch(0.62 0.12 240 / 0.10);
+    --purple-bg: oklch(0.58 0.16 300 / 0.10);
+    --rad: 6px;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html{font-size:14px;-webkit-font-smoothing:antialiased}
+  body{
+    font-family:'PingFang SC','Hiragino Sans GB','Noto Sans SC','Microsoft YaHei',sans-serif;
+    background:var(--bg);color:var(--text);min-height:100vh
+  }
+  .header{
+    background:var(--surface);border-bottom:1px solid var(--border);
+    padding:16px 24px;position:sticky;top:0;z-index:100
+  }
+  .h-inner{
+    max-width:1200px;margin:0 auto;display:flex;align-items:center;
+    justify-content:space-between;gap:16px;flex-wrap:wrap
+  }
+  .h-title{font-size:1.1rem;font-weight:700;letter-spacing:-0.01em}
+  .h-sub{font-size:0.78rem;color:var(--text2);margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .h-code{
+    font-family:'SF Mono','Cascadia Code','JetBrains Mono','Consolas',monospace;
+    background:var(--elevated);padding:2px 8px;border-radius:4px;
+    font-size:0.76rem;color:var(--purple);letter-spacing:0.02em
+  }
+  .h-badge{
+    font-size:0.72rem;background:var(--purple-bg);color:var(--purple);
+    padding:2px 7px;border-radius:3px;font-weight:600
+  }
+  .h-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
+  .status{font-size:0.76rem;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .dot.loading{background:var(--yellow);animation:pulse 1.2s ease-in-out infinite}
+  .dot.ok{background:var(--green)}.dot.err{background:var(--red)}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.85)}}
+  .btn{
+    font-family:inherit;font-size:0.82rem;font-weight:600;padding:8px 18px;
+    border-radius:var(--rad);border:1px solid oklch(0.58 0.16 300 / 0.35);
+    background:var(--purple-bg);color:var(--purple);cursor:pointer;
+    transition:all 0.2s;display:flex;align-items:center;gap:6px;white-space:nowrap
+  }
+  .btn:hover{background:oklch(0.58 0.16 300 / 0.22);border-color:var(--purple)}
+  .btn:active{transform:scale(0.97)}.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+  .btn svg{width:14px;height:14px;flex-shrink:0}
+  .btn.refreshing svg{animation:spin 0.8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ETF Summary */
+  .etf-summary{
+    max-width:1200px;margin:0 auto;padding:14px 24px 6px
+  }
+  .etf-summary-inner{
+    background:var(--blue-bg);
+    border:1px solid oklch(0.62 0.12 240 / 0.25);
+    border-radius:var(--rad);
+    padding:14px 18px;
+    display:flex;align-items:center;gap:28px;flex-wrap:wrap
+  }
+  .etf-summary-item{display:flex;align-items:baseline;gap:8px}
+  .etf-summary-label{font-size:0.74rem;color:var(--text2);letter-spacing:0.03em}
+  .etf-summary-value{font-size:1.15rem;font-weight:700;font-family:monospace;color:var(--blue)}
+  .etf-summary-value.up{color:var(--green)}.etf-summary-value.down{color:var(--red)}
+
+  .stats{
+    max-width:1200px;margin:0 auto;padding:6px 24px 10px;
+    display:flex;gap:20px;flex-wrap:wrap
+  }
+  .stat{display:flex;flex-direction:column;gap:2px}
+  .stat-l{font-size:0.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em}
+  .stat-v{font-size:0.92rem;font-weight:700;font-family:monospace}
+
+  /* Disclaimer */
+  .disc{
+    max-width:1200px;margin:0 auto;padding:0 24px 4px;
+    font-size:0.7rem;color:var(--muted);line-height:1.6
+  }
+
+  .tbl-outer{max-width:1200px;margin:0 auto;padding:0 24px 40px}
+  .tbl-wrap{
+    background:var(--surface);border-radius:8px;
+    border:1px solid var(--border);
+    overflow-x:auto;-webkit-overflow-scrolling:touch
+  }
+  .tbl-wrap::after{
+    content:'';position:sticky;right:0;top:0;bottom:0;width:24px;
+    background:linear-gradient(to right,transparent,var(--surface));
+    pointer-events:none;z-index:1;float:right;margin-left:-24px
+  }
+  table{min-width:100%;border-collapse:collapse;font-size:0.8rem;white-space:nowrap}
+  thead th{
+    background:var(--elevated);color:var(--text2);font-weight:600;
+    text-align:right;padding:10px 12px;font-size:0.74rem;letter-spacing:0.02em;
+    border-bottom:2px solid var(--border);cursor:pointer;user-select:none
+  }
+  thead th:first-child{text-align:center}
+  thead th:nth-child(2),thead th:nth-child(3){text-align:left}
+  thead th:nth-child(4){text-align:center}
+  thead th:hover{color:var(--text)}
+  thead th .si{display:inline-block;margin-left:3px;font-size:0.6rem;opacity:0.3}
+  thead th.sort .si{opacity:1;color:var(--purple)}
+  thead th.sort{color:var(--purple)}
+  tbody td{
+    padding:9px 12px;text-align:right;border-bottom:1px solid oklch(0.25 0.012 255 / 0.4);
+    font-family:monospace;font-size:0.78rem
+  }
+  tbody td:nth-child(1){text-align:center;color:var(--muted);font-size:0.74rem;width:38px}
+  tbody td:nth-child(2){text-align:left;color:var(--text2)}
+  tbody td:nth-child(3){text-align:left;font-family:inherit;font-weight:500}
+  tbody td:nth-child(4){text-align:center;font-weight:600}
+  tbody td.mkt{font-size:0.68rem;color:var(--muted);text-transform:uppercase}
+  tbody td.wt{color:var(--purple);font-weight:600}
+  tbody td.ewt{color:var(--green);font-weight:600}
+  tbody td.pr{font-weight:600}
+  tbody td.pos{color:var(--green)}tbody td.neg{color:var(--red)}
+  tbody td.tm{color:var(--muted);font-size:0.74rem}
+  tbody tr{transition:background 0.12s}
+  tbody tr:hover{background:var(--hover)}
+  tbody tr:last-child td{border-bottom:none}
+  .msg{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:70px 24px;color:var(--muted);gap:12px;text-align:center
+  }
+  .msg .ico{font-size:2.2rem;opacity:0.45}
+  .msg .tt{font-size:0.95rem;font-weight:600;color:var(--text2)}
+  .msg .tx{font-size:0.8rem;max-width:420px;line-height:1.6}
+  .ft{
+    max-width:1200px;margin:0 auto;padding:0 24px 16px;
+    font-size:0.68rem;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap
+  }
+  .ft span{opacity:0.55}
+  @media(max-width:768px){
+    .header{padding:12px 14px}.h-title{font-size:0.95rem}
+    .etf-summary{padding:10px 14px 2px}.etf-summary-inner{padding:10px 14px;gap:16px}
+    .etf-summary-value{font-size:1rem}
+    .stats{padding:4px 14px 8px;gap:10px}.tbl-outer{padding:0 10px 24px}
+    table{font-size:0.72rem}thead th,tbody td{padding:7px 8px}
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="h-inner">
+    <div class="h-left">
+      <div class="h-title">中欧信息科技混合发起C 持仓实时分析</div>
+      <div class="h-sub">
+        <span class="h-code">023452</span>
+        <span class="h-badge">混合型-偏股</span>
+        <span>基金经理：杜厚良 · 成立：2025-02-26 · 净值：3.9578 (06-18)</span>
+      </div>
+    </div>
+    <div class="h-right">
+      <div class="status"><span class="dot" id="dot"></span><span id="ts">—</span></div>
+      <button class="btn" id="btn" onclick="doRefresh()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 11-3-6.7M21 2v6h-6"/></svg>
+        刷新数据
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="etf-summary" id="etfSummary" style="display:none">
+  <div class="etf-summary-inner">
+    <div class="etf-summary-item">
+      <span class="etf-summary-label">基金预估日内波动率</span>
+      <span class="etf-summary-value" id="etfVol">—</span>
+    </div>
+    <div class="etf-summary-item">
+      <span class="etf-summary-label">前十合计占比</span>
+      <span class="etf-summary-value" id="etfTotal">60.54%（季报）</span>
+    </div>
+    <div class="etf-summary-item">
+      <span class="etf-summary-label">最大波动贡献</span>
+      <span class="etf-summary-value" id="etfContrib">—</span>
+    </div>
+  </div>
+</div>
+
+<div class="stats" id="stats" style="display:none">
+  <div class="stat"><span class="stat-l">展示股票</span><span class="stat-v" id="sCnt">—</span></div>
+  <div class="stat"><span class="stat-l">涨 / 跌</span><span class="stat-v" id="sUd">—</span></div>
+  <div class="stat"><span class="stat-l">数据截至</span><span class="stat-v" id="sSrc">2026Q1季报</span></div>
+</div>
+
+<div class="disc">
+  <b style="color:var(--yellow)">主动型基金 ≠ ETF</b>：本基金为主动管理混合型，监管仅要求季报披露<b>前十大</b>重仓股（当前合计占净值 60.54%）。<b>全持仓</b>仅在半年报（6月底）和年报（12月底）公开，无每日 PCF 申赎清单可供自动同步。<br>
+  下一份全持仓预计为 <b>2026 半年报</b>（约 8 月底披露），届时可更新全部持仓。当前估算权重 = (季报持股数 × 实时价 CNY) ÷ Σ(持股数 × 实时价 CNY) × 60.54%，港股按 HKD × 0.93 ≈ CNY 折算。数据截止 2026-03-31。
+</div>
+
+<div class="tbl-outer">
+  <div class="tbl-wrap" id="wrap">
+    <div class="msg" id="empty">
+      <div class="ico">&#9636;</div>
+      <div class="tt">点击刷新加载数据</div>
+      <div class="tx">通过腾讯行情接口获取 023452 前十大重仓股实时价格，估算当前权重与日内波动率</div>
+    </div>
+    <table id="tbl" style="display:none">
+      <thead><tr>
+        <th data-sort="idx">#</th>
+        <th data-sort="code">股票代码</th>
+        <th data-sort="name">股票名称</th>
+        <th data-sort="wt_q1">季报权重(Q1) <span class="si">▼</span></th>
+        <th data-sort="ewt" class="sort">估算当前权重 <span class="si">▼</span></th>
+        <th data-sort="open">今日开盘价</th>
+        <th data-sort="price">最新价</th>
+        <th data-sort="time">更新时间</th>
+        <th data-sort="chg">开盘→当前波动率</th>
+        <th data-sort="pchg">股价变化(元)</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="ft">
+  <span>行情：qt.gtimg.cn（腾讯）| 持仓来源：中欧基金2026Q1季报 (2026-03-31)</span>
+  <span>估算权重≠真实权重，基于季报持股数×实时价格等比缩放 | 仅前十重仓，全覆盖率 ~60%</span>
+  <span>R键刷新 | 交易时段每60s自动刷新</span>
+</div>
+
+<script>
+/* ═══════════════ Fund Holdings ═══════════════
+ * Source: 中欧信息科技混合发起C 2026Q1季报 (2026-03-31)
+ * Only top-10 is publicly disclosed for quarterly reports.
+ * Total top-10 weight: 60.54% of NAV.
+ *
+ * Est. current weight = (qty × price_cny) / Σ(qty × price_cny) × 60.54%
+ * For HK stocks, price_hkd × 0.93 ≈ price_cny
+ */
+var FUND_HOLDINGS = [
+  {code:'300502',name:'新易盛',       qty:1999883, wtQ1:9.76, market:'sz'},
+  {code:'300308',name:'中际旭创',     qty:1428671, wtQ1:8.97, market:'sz'},
+  {code:'06869',name:'长飞光纤光缆',  qty:4255000, wtQ1:7.58, market:'hk'},
+  {code:'300394',name:'天孚通信',     qty:2048354, wtQ1:6.81, market:'sz'},
+  {code:'600487',name:'亨通光电',     qty:9639477, wtQ1:5.60, market:'sh'},
+  {code:'601138',name:'工业富联',     qty:9820340, wtQ1:5.57, market:'sh'},
+  {code:'301128',name:'强瑞技术',     qty:2635405, wtQ1:4.30, market:'sz'},
+  {code:'600522',name:'中天科技',     qty:12655275,wtQ1:4.20, market:'sh'},
+  {code:'603986',name:'兆易创新',     qty:1501090, wtQ1:3.94, market:'sh'},
+  {code:'00700',name:'腾讯控股',      qty:808100,  wtQ1:3.81, market:'hk'}
+];
+var TOTAL_Q1_WEIGHT = 60.54; // Sum of top-10 disclosed weights
+var HKD_CNY = 0.93;          // Approximate exchange rate
+
+/* ═══════════════ DOM ═══════════════ */
+var btn=document.getElementById('btn'),dot=document.getElementById('dot'),
+    ts=document.getElementById('ts'),tbl=document.getElementById('tbl'),
+    tbody=document.getElementById('tbody'),empty=document.getElementById('empty'),
+    stats=document.getElementById('stats'),etfSummary=document.getElementById('etfSummary');
+
+var sortField='ewt',sortAsc=false,latestData=[],latestQuotes={};
+
+/* ═══════════════ Fetch via fetch() (Tencent qt.gtimg.cn) ═══════════════ */
+function fetchQuotes(callback){
+  var codes=[],codeMap={};
+  for(var i=0;i<FUND_HOLDINGS.length;i++){
+    var h=FUND_HOLDINGS[i];
+    var raw=h.market==='hk'?'r_hk'+h.code:h.market+h.code;
+    codes.push(raw);
+    codeMap[raw]=h;
+  }
+  var url='https://qt.gtimg.cn/q='+codes.join(',');
+
+  var controller=new AbortController();
+  var timeout=setTimeout(function(){
+    controller.abort();
+    callback(new Error('腾讯行情接口超时'));
+  },12000);
+
+  fetch(url,{signal:controller.signal})
+    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.text();})
+    .then(function(text){
+      clearTimeout(timeout);
+      var results={};
+      var re=/v_([\w]+)="([^"]*)"/g,m;
+      while((m=re.exec(text))!==null){
+        var rawCode=m[1],val=m[2];
+        var h=codeMap[rawCode];
+        if(!h)continue;
+        var f=val.split('~');
+        if(f.length>5){
+          var price=parseFloat(f[3])||0;
+          var open=parseFloat(f[5])||0;
+          // Convert HK price to CNY for weight calculation
+          var priceCny=price,openCny=open;
+          if(h.market==='hk'){priceCny=price*HKD_CNY;openCny=open*HKD_CNY;}
+          results[h.code]={
+            name:f[1]||h.name,
+            price:price,open:open,
+            priceCny:priceCny,openCny:openCny,
+            ts:parseTs(f[30]),
+            currency:h.market==='hk'?'HKD':'CNY'
+          };
+        }
+      }
+      callback(null,results);
+    })
+    .catch(function(e){
+      clearTimeout(timeout);
+      callback(new Error(e.name==='AbortError'?'腾讯行情接口超时':'腾讯行情接口加载失败'));
+    });
+}
+
+function parseTs(raw){
+  if(!raw)return'';var s=String(raw);
+  // HK format: "2026/07/10 13:58:55", mainland: "20260710135855"
+  if(s.indexOf('/')>=0){
+    var p=s.split(' ');if(p.length>=2)return p[1];return s;
+  }
+  if(s.length>=14)return s.substring(8,10)+':'+s.substring(10,12)+':'+s.substring(12,14);
+  return s;
+}
+
+/* ═══════════════ Calculate & Render ═══════════════ */
+function calcAndRender(quotes){
+  latestQuotes=quotes;
+
+  // Pass 1: total weighted market value (CNY)
+  var totalVal=0;
+  for(var i=0;i<FUND_HOLDINGS.length;i++){
+    var h=FUND_HOLDINGS[i],q=quotes[h.code]||{};
+    totalVal+=h.qty*(q.priceCny||0);
+  }
+
+  // Pass 2: build rows
+  var stocks=[];
+  for(var i=0;i<FUND_HOLDINGS.length;i++){
+    var h=FUND_HOLDINGS[i],q=quotes[h.code]||{};
+    var price=q.price||0,open=q.open||0;
+    var priceCny=q.priceCny||0;
+    var val=h.qty*priceCny;
+    var ewt=totalVal>0?(val/totalVal)*TOTAL_Q1_WEIGHT:0;
+    var chgPct=null,priceChg=null;
+    if(open>0&&price>0){
+      chgPct=((price-open)/open)*100;
+      priceChg=price-open;
+      if(h.market==='hk')priceChg=priceChg*HKD_CNY;
+    }
+    stocks.push({
+      code:h.code,name:h.name||q.name||'',market:h.market,
+      wtQ1:h.wtQ1,ewt:ewt,
+      open:open,price:price,
+      currency:q.currency||(h.market==='hk'?'HKD':'CNY'),
+      updateTime:q.ts||'',chgPct:chgPct,priceChg:priceChg
+    });
+  }
+
+  // ETF-level metrics
+  var fundVol=0;
+  var up=0,dn=0;
+  var topPos=null,topNeg=null;
+
+  for(var i=0;i<stocks.length;i++){
+    var s=stocks[i];
+    if(s.chgPct!==null){
+      fundVol+=s.ewt*s.chgPct;
+      if(s.chgPct>0)up++;else if(s.chgPct<0)dn++;
+      var contrib=s.ewt*s.chgPct/100;
+      if(contrib>0&&(!topPos||contrib>topPos.c))topPos={n:s.name,c:contrib};
+      if(contrib<0&&(!topNeg||contrib<topNeg.c))topNeg={n:s.name,c:contrib};
+    }
+  }
+  fundVol=fundVol/100;
+
+  var volCls=fundVol>=0?'up':'down';
+  document.getElementById('etfVol').textContent=(fundVol>=0?'+':'')+fundVol.toFixed(2)+'%';
+  document.getElementById('etfVol').className='etf-summary-value '+volCls;
+
+  var contribStr='';
+  if(topPos)contribStr+=topPos.n+'(+'+topPos.c.toFixed(2)+'%%)';
+  if(topNeg)contribStr+=(contribStr?' / ':'')+topNeg.n+'('+topNeg.c.toFixed(2)+'%%)';
+  document.getElementById('etfContrib').textContent=contribStr||'—';
+  document.getElementById('sCnt').textContent=stocks.length;
+  document.getElementById('sUd').innerHTML='<span style="color:var(--green)">'+up+' ↑</span> / <span style="color:var(--red)">'+dn+' ↓</span>';
+
+  // Sort
+  stocks.sort(function(a,b){
+    var va,vb;
+    switch(sortField){
+      case 'wt_q1':va=a.wtQ1;vb=b.wtQ1;break;
+      case 'ewt':va=a.ewt;vb=b.ewt;break;
+      case 'code':va=a.code;vb=b.code;break;
+      case 'name':va=a.name;vb=b.name;break;
+      case 'open':va=a.open;vb=b.open;break;
+      case 'price':va=a.price;vb=b.price;break;
+      case 'time':va=a.updateTime;vb=b.updateTime;break;
+      case 'chg':va=a.chgPct!==null?a.chgPct:-Infinity;vb=b.chgPct!==null?b.chgPct:-Infinity;break;
+      case 'pchg':va=a.priceChg!==null?a.priceChg:-Infinity;vb=b.priceChg!==null?b.priceChg:-Infinity;break;
+      default:return 0;
+    }
+    if(va===vb)return 0;
+    return sortAsc?(va<vb?-1:1):(va>vb?-1:1);
+  });
+
+  // Render
+  var html='';
+  for(var i=0;i<stocks.length;i++){
+    var s=stocks[i];
+    var priceDisp=s.price>0?s.price.toFixed(2):'—';
+    var openDisp=s.open>0?s.open.toFixed(2):'—';
+    var curSym=s.currency==='HKD'?'<span class="mkt">HK$</span> ':'';
+    var chgCls=s.chgPct===null?'':(s.chgPct>=0?'pos':'neg');
+    var pchgCls=s.priceChg===null?'':(s.priceChg>=0?'pos':'neg');
+    var chgStr=s.chgPct!==null?((s.chgPct>=0?'+':'')+s.chgPct.toFixed(2)+'%'):'—';
+    var pchgStr=s.priceChg!==null?((s.priceChg>=0?'+':'')+s.priceChg.toFixed(2)):'—';
+    var pchgCur='';
+
+    html+='<tr>'+
+      '<td>'+(i+1)+'</td>'+
+      '<td>'+s.code+'</td>'+
+      '<td>'+s.name+'</td>'+
+      '<td class="wt">'+s.wtQ1.toFixed(2)+'%</td>'+
+      '<td class="ewt">'+s.ewt.toFixed(2)+'%</td>'+
+      '<td>'+curSym+openDisp+'</td>'+
+      '<td class="pr">'+curSym+priceDisp+'</td>'+
+      '<td class="tm">'+(s.updateTime||'—')+'</td>'+
+      '<td class="'+chgCls+'">'+chgStr+'</td>'+
+      '<td class="'+pchgCls+'">'+pchgStr+pchgCur+'</td>'+
+      '</tr>';
+  }
+  tbody.innerHTML=html;
+
+  // Sort indicator
+  var ths=document.querySelectorAll('thead th');
+  for(var i=0;i<ths.length;i++){
+    var th=ths[i],f=th.dataset.sort;
+    th.classList.toggle('sort',f===sortField);
+    var si=th.querySelector('.si');
+    if(si)si.textContent=f===sortField?(sortAsc?'▲':'▼'):'⇅';
+  }
+
+  empty.style.display='none';tbl.style.display='';
+  stats.style.display='';etfSummary.style.display='';
+  latestData=stocks;
+}
+
+/* ═══════════════ Refresh ═══════════════ */
+function doRefresh(){
+  if(btn.disabled)return;
+  btn.disabled=true;btn.classList.add('refreshing');
+  dot.className='dot loading';ts.textContent='加载中...';
+  var t0=performance.now();
+
+  fetchQuotes(function(err,quotes){
+    btn.disabled=false;btn.classList.remove('refreshing');
+    if(err){dot.className='dot err';ts.textContent='失败: '+err.message;console.error(err);return;}
+    calcAndRender(quotes);
+    var elapsed=((performance.now()-t0)/1000).toFixed(1);
+    var now=new Date();
+    ts.textContent=now.toLocaleTimeString('zh-CN',{hour12:false})+' ('+elapsed+'s)';
+    dot.className='dot ok';
+  });
+}
+
+/* ═══════════════ Sort ═══════════════ */
+document.querySelector('thead').addEventListener('click',function(e){
+  var th=e.target.closest('th');if(!th)return;
+  var f=th.dataset.sort;if(!f)return;
+  if(sortField===f)sortAsc=!sortAsc;else{sortField=f;sortAsc=false;}
+  if(latestData.length>0)calcAndRender(latestQuotes);
+});
+
+/* ═══════════════ Auto-refresh ═══════════════ */
+function isTradeTime(){
+  var n=new Date(),d=n.getDay();
+  if(d===0||d===6)return false;
+  var m=n.getHours()*60+n.getMinutes();
+  return(m>=555&&m<=695)||(m>=775&&m<=905);
+}
+setInterval(function(){if(isTradeTime()&&!btn.disabled)doRefresh()},60000);
+
+document.addEventListener('keydown',function(e){
+  if((e.key==='r'||e.key==='R')&&!(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'))doRefresh();
+});
+
+doRefresh();
+</script>
+</body>
+</html>
